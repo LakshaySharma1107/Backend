@@ -1,3 +1,19 @@
+CREATE OR REPLACE FUNCTION identify_contact(email TEXT, phone TEXT)
+RETURNS JSON AS $$
+DECLARE
+    result JSON;
+BEGIN
+    -- Replace this with actual logic to create result JSON
+    result := json_build_object(
+        'email', email,
+        'phone', phone,
+        'status', 'success'
+    );
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+
 CREATE OR REPLACE PROCEDURE identify_contact(
     IN input_email VARCHAR(255),
     IN input_phoneNumber VARCHAR(255),
