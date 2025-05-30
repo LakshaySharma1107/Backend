@@ -3,15 +3,15 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
-app.use(express.json()); // Parse incoming JSON data from user
+app.use(express.json()); // Parse JSON bodies
 
-// Connect to Render PostgreSQL using DATABASE_URL
+// Connect to PostgreSQL on Render
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Required for Render's PostgreSQL
+    ssl: { rejectUnauthorized: false }
 });
 
-// Test database connection
+// Test DB connection
 pool.connect((err, client, release) => {
     if (err) {
         console.error('Error connecting to PostgreSQL:', err.stack);
@@ -21,30 +21,36 @@ pool.connect((err, client, release) => {
     release();
 });
 
-// /identify endpoint: Receive user data and process it
+// POST /identify endpoint
 app.post('/identify', async (req, res) => {
-    const { email, phoneNumber } = req.body; // Get email and phoneNumber from user request
-    let client;
+    const { email, phoneNumber } = req.body;
 
+    if (!email || !phoneNumber) {
+        return res.status(400).json({ error: 'Email and phoneNumber are required' });
+    }
+
+    let client;
     try {
         client = await pool.connect();
-        // Call the stored procedure in PostgreSQL
-        await client.query('CALL identify_contact($1, $2, NULL)', [email, phoneNumber]);
-        // Fetch the output JSON from the procedure
-        const result = await client.query('SELECT $1 AS result_json', ['result_json']);
-        const response = result.rows[0].result_json;
 
-        // Send the response back to the user
+        // Call the PostgreSQL FUNCTION (not PROCEDURE)
+        const result = await client.query(
+            'SELECT identify_contact($1, $2) AS result_json',
+            [email, phoneNumber]
+        );
+
+        const response = result.rows[0].result_json;
         res.status(200).json(response);
+
     } catch (error) {
-        console.error('Error executing procedure:', error.stack);
+        console.error('Error executing query:', error.stack);
         res.status(500).json({ error: 'Internal server error' });
     } finally {
-        if (client) client.release(); // Release connection back to pool
+        if (client) client.release();
     }
 });
 
-// Start the server
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
